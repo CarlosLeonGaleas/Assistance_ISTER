@@ -4,6 +4,7 @@ import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Bundle
+import android.os.Environment
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -15,7 +16,6 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -25,7 +25,6 @@ import androidx.compose.ui.unit.sp
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
-import com.google.gson.Gson
 import com.google.zxing.integration.android.IntentIntegrator
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -50,15 +49,53 @@ class MainActivity : ComponentActivity() {
                     color = MaterialTheme.colorScheme.background
                 ) {
                     QRScannerScreen(
-                        onScanClick = { startQRScanner() }
+                        onScanClick = { startQRScanner() },
+                        onResetClick = { resetFile() },
+                        onDownloadClick = { downloadFile() }
                     )
                 }
             }
         }
     }
 
+    private fun resetFile() {
+        val file = File(getExternalFilesDir(null), "qr_data.csv")
+        if (file.exists()) {
+            if (file.delete()) {
+                Toast.makeText(this, "Archivo reseteado correctamente", Toast.LENGTH_SHORT).show()
+            } else {
+                Toast.makeText(this, "Error al resetear el archivo", Toast.LENGTH_SHORT).show()
+            }
+        } else {
+            Toast.makeText(this, "No hay archivo para resetear", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    private fun downloadFile() {
+        val sourceFile = File(getExternalFilesDir(null), "qr_data.csv")
+        if (sourceFile.exists()) {
+            val downloadsDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
+            if (!downloadsDir.exists()) {
+                downloadsDir.mkdirs() // Crea la carpeta Descargas si no existe
+            }
+
+            val targetFile = File(downloadsDir, sourceFile.name)
+            try {
+                sourceFile.copyTo(targetFile, overwrite = true)
+                Toast.makeText(this, "Archivo guardado en Descargas", Toast.LENGTH_SHORT).show()
+            } catch (e: Exception) {
+                Toast.makeText(this, "Error al guardar archivo: ${e.message}", Toast.LENGTH_SHORT).show()
+            }
+        } else {
+            Toast.makeText(this, "No hay archivo para descargar", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+
     @Composable
-    fun QRScannerScreen(onScanClick: () -> Unit) {
+    fun QRScannerScreen(onScanClick: () -> Unit,
+                        onResetClick: () -> Unit,
+                        onDownloadClick: () -> Unit) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -76,7 +113,7 @@ class MainActivity : ComponentActivity() {
                     .height(100.dp)
             )
 
-            Spacer(modifier = Modifier.height(100.dp))
+            Spacer(modifier = Modifier.height(75.dp))
 
             // Título
             Text(
@@ -90,7 +127,7 @@ class MainActivity : ComponentActivity() {
                 modifier = Modifier.fillMaxWidth()
             )
 
-            Spacer(modifier = Modifier.height(100.dp))
+            Spacer(modifier = Modifier.height(80.dp))
 
             // Botón de Escanear QR
             Button(
@@ -108,6 +145,36 @@ class MainActivity : ComponentActivity() {
                     color = Color.White,
                     textAlign = TextAlign.Center
                 )
+            }
+
+            Spacer(modifier = Modifier.height(20.dp))
+
+            Button(
+                onClick = onResetClick,
+                modifier = Modifier
+                    .width(150.dp)
+                    .height(35.dp)
+                    .background(color = Color(0xFF27348B)),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = Color(0xFF27348B)
+                )
+            ) {
+                Text("Resetear BD")
+            }
+
+            Spacer(modifier = Modifier.height(20.dp))
+
+            Button(
+                onClick = onDownloadClick,
+                modifier = Modifier
+                    .width(150.dp)
+                    .height(35.dp)
+                    .background(color = Color(0xFF27348B)),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = Color(0xFF27348B)
+                )
+            ) {
+                Text("Descargar BD")
             }
 
             Spacer(modifier = Modifier.weight(1f))
