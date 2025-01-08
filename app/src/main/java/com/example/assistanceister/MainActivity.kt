@@ -5,6 +5,8 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Bundle
 import android.os.Environment
+import android.speech.tts.TextToSpeech
+import android.util.Log
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -27,15 +29,20 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
 import com.google.zxing.integration.android.IntentIntegrator
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 import java.io.File
 import java.io.FileWriter
+import java.util.Locale
 
 class MainActivity : ComponentActivity() {
     private lateinit var apiService: ApiService
+    private var isScanning = false
+    private lateinit var textToSpeech: TextToSpeech
+
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -49,14 +56,36 @@ class MainActivity : ComponentActivity() {
                     color = MaterialTheme.colorScheme.background
                 ) {
                     QRScannerScreen(
-                        onScanClick = { startQRScanner() },
+                        onScanningClick = { startContinuousScan() },
                         onResetClick = { resetFile() },
                         onDownloadClick = { downloadFile() }
                     )
                 }
             }
         }
+        textToSpeech = TextToSpeech(this) { status ->
+            if (status == TextToSpeech.SUCCESS) {
+                textToSpeech.language = Locale.getDefault()
+
+                // Ajustar velocidad de lectura (1.0 es normal, 0.5 es más lento, 2.0 es más rápido)
+                textToSpeech.setSpeechRate(1.3f)
+
+                // Ajustar tono de voz (1.0 es normal, 0.5 es más grave, 2.0 es más agudo)
+                textToSpeech.setPitch(0.8f)
+            }else {
+                Log.e("TTS", "Inicialización fallida")
+            }
+        }
+
     }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        if (::textToSpeech.isInitialized) {
+            textToSpeech.shutdown()
+        }
+    }
+
 
     private fun resetFile() {
         val file = File(getExternalFilesDir(null), "qr_data.csv")
@@ -93,9 +122,10 @@ class MainActivity : ComponentActivity() {
 
 
     @Composable
-    fun QRScannerScreen(onScanClick: () -> Unit,
+    fun QRScannerScreen(onScanningClick: () -> Unit,
                         onResetClick: () -> Unit,
                         onDownloadClick: () -> Unit) {
+        var showDialog by remember { mutableStateOf(false) } // Controla si se muestra el diálogo
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -117,7 +147,7 @@ class MainActivity : ComponentActivity() {
 
             // Título
             Text(
-                text = "Registro de Asistencia del Personal ISTER",
+                text = "Registro de Asistencia",
                 color = Color(0xFF27348B),
                 fontSize = 50.sp,
                 fontWeight = FontWeight.Bold,
@@ -129,9 +159,10 @@ class MainActivity : ComponentActivity() {
 
             Spacer(modifier = Modifier.height(80.dp))
 
-            // Botón de Escanear QR
+            // Botón para activar el Modo Escaneo
+
             Button(
-                onClick = onScanClick,
+                onClick = onScanningClick,
                 modifier = Modifier
                     .width(300.dp)
                     .height(49.dp)
@@ -141,25 +172,9 @@ class MainActivity : ComponentActivity() {
                 )
             ) {
                 Text(
-                    text = "Escanear QR de la Credencial",
+                    text = "Empezar Registro",
                     color = Color.White,
-                    textAlign = TextAlign.Center
-                )
-            }
-
-            Spacer(modifier = Modifier.height(20.dp))
-
-            Button(
-                onClick = onResetClick,
-                modifier = Modifier
-                    .width(150.dp)
-                    .height(35.dp)
-                    .background(color = Color(0xFF27348B)),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = Color(0xFF27348B)
-                )
-            ) {
-                Text("Resetear BD")
+                    textAlign = TextAlign.Center)
             }
 
             Spacer(modifier = Modifier.height(20.dp))
@@ -174,7 +189,48 @@ class MainActivity : ComponentActivity() {
                     containerColor = Color(0xFF27348B)
                 )
             ) {
-                Text("Descargar BD")
+                Text("Descargar Datos")
+            }
+
+            Spacer(modifier = Modifier.height(20.dp))
+
+            Button(
+                onClick = { showDialog = true },
+                modifier = Modifier
+                    .width(150.dp)
+                    .height(35.dp)
+                    .background(color = Color(0xFFFF0000)),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = Color(0xFFFF0000)
+                )
+            ) {
+                Text("Resetear Datos")
+            }
+
+            // Diálogo de confirmación
+            if (showDialog) {
+                AlertDialog(
+                    onDismissRequest = { showDialog = false }, // Cierra el diálogo sin hacer nada
+                    title = { Text("Confirmar acción") },
+                    text = { Text("¿Estás seguro de que deseas resetear los datos? Esta acción no se puede deshacer.") },
+                    confirmButton = {
+                        TextButton(
+                            onClick = {
+                                showDialog = false
+                                onResetClick() // Llama a la acción de reseteo
+                            }
+                        ) {
+                            Text("Sí")
+                        }
+                    },
+                    dismissButton = {
+                        TextButton(
+                            onClick = { showDialog = false } // Solo cierra el diálogo
+                        ) {
+                            Text("No")
+                        }
+                    }
+                )
             }
 
             Spacer(modifier = Modifier.weight(1f))
@@ -231,6 +287,23 @@ class MainActivity : ComponentActivity() {
         integrator.initiateScan()
     }
 
+    private fun startContinuousScan() {
+        isScanning = true
+        lifecycleScope.launch {
+            while (isScanning) {
+                try {
+                    startQRScanner()
+                } catch (e: Exception) {
+                    Toast.makeText(this@MainActivity, "Error: ${e.message}", Toast.LENGTH_SHORT).show()
+                }
+
+                // Esperar 2 segundos antes de volver a escanear
+                delay(2000)
+            }
+        }
+    }
+
+
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         val result = IntentIntegrator.parseActivityResult(requestCode, resultCode, data)
         if (result != null) {
@@ -239,6 +312,8 @@ class MainActivity : ComponentActivity() {
                 processQRUrl(qrUrl)
             } else {
                 Toast.makeText(this, "Escaneo cancelado", Toast.LENGTH_SHORT).show()
+                textToSpeech.speak("Escaneo cancelado", TextToSpeech.QUEUE_FLUSH, null, null)
+                isScanning = false
             }
         } else {
             super.onActivityResult(requestCode, resultCode, data)
@@ -270,6 +345,8 @@ class MainActivity : ComponentActivity() {
                         } else {
                             "QR de credencial inválida"
                         }
+
+                        textToSpeech.speak(toastMessage, TextToSpeech.QUEUE_FLUSH, null, null)
 
                         Toast.makeText(
                             this@MainActivity,
