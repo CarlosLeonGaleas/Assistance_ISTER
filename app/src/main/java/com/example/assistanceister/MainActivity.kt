@@ -3,6 +3,7 @@ package com.example.assistanceister
 import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
 import android.os.Environment
 import android.speech.tts.TextToSpeech
@@ -10,8 +11,10 @@ import android.util.Log
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.annotation.RequiresApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -36,6 +39,10 @@ import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 import java.io.File
 import java.io.FileWriter
+import java.text.SimpleDateFormat
+import java.time.LocalDateTime
+import java.time.format.DateTimeFormatter
+import java.util.Date
 import java.util.Locale
 
 class MainActivity : ComponentActivity() {
@@ -44,6 +51,7 @@ class MainActivity : ComponentActivity() {
     private lateinit var textToSpeech: TextToSpeech
 
 
+    @RequiresApi(Build.VERSION_CODES.O)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setupRetrofit()
@@ -55,7 +63,7 @@ class MainActivity : ComponentActivity() {
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
-                    QRScannerScreen(
+                    MainScreen(
                         onScanningClick = { startContinuousScan() },
                         onResetClick = { resetFile() },
                         onDownloadClick = { downloadFile() }
@@ -121,11 +129,19 @@ class MainActivity : ComponentActivity() {
     }
 
 
+    @RequiresApi(Build.VERSION_CODES.O)
     @Composable
-    fun QRScannerScreen(onScanningClick: () -> Unit,
+    fun MainScreen(onScanningClick: () -> Unit,
                         onResetClick: () -> Unit,
                         onDownloadClick: () -> Unit) {
         var showDialog by remember { mutableStateOf(false) } // Controla si se muestra el diálogo
+        var showManualForm by remember { mutableStateOf(false) }
+        var cedula by remember { mutableStateOf("") }
+        var nombreCompleto by remember { mutableStateOf("") }
+        var correo by remember { mutableStateOf("") }
+        var rol by remember { mutableStateOf("") }
+        val roles = listOf("Público Externo", "Estudiante", "Docente", "Administrativo")
+
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -143,129 +159,214 @@ class MainActivity : ComponentActivity() {
                     .height(100.dp)
             )
 
-            Spacer(modifier = Modifier.height(75.dp))
+            if (!showManualForm) {
+                Spacer(modifier = Modifier.height(80.dp))
 
-            // Título
-            Text(
-                text = "Registro de Asistencia",
-                color = Color(0xFF27348B),
-                fontSize = 60.sp,
-                fontWeight = FontWeight.Bold,
-                fontStyle = FontStyle.Italic,
-                textAlign = TextAlign.Center,
-                lineHeight = 60.sp,
-                modifier = Modifier.fillMaxWidth()
-            )
-
-            Spacer(modifier = Modifier.height(80.dp))
-
-            // Botón para activar el Modo de Registro Automático
-            Button(
-                onClick = onScanningClick,
-                modifier = Modifier
-                    .width(300.dp)
-                    .height(39.dp)
-                    .background(color = Color(0xFF27348B)),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = Color(0xFF27348B)
-                ),
-                contentPadding = PaddingValues(horizontal = 0.dp, vertical = 0.dp)
-            ) {
+                // Título
                 Text(
-                    text = "Registro Automático",
-                    color = Color.White,
+                    text = "Registro de Asistencia",
+                    color = Color(0xFF27348B),
+                    fontSize = 60.sp,
+                    fontWeight = FontWeight.Bold,
+                    fontStyle = FontStyle.Italic,
                     textAlign = TextAlign.Center,
-                    fontSize = 25.sp)
-            }
+                    lineHeight = 60.sp,
+                    modifier = Modifier.fillMaxWidth()
+                )
 
-            Spacer(modifier = Modifier.height(20.dp))
+                Spacer(modifier = Modifier.height(80.dp))
 
-            // Botón para activar el Modo Registro Manual
-            Button(
-                onClick = onScanningClick,
-                modifier = Modifier
-                    .width(300.dp)
-                    .height(39.dp)
-                    .background(color = Color(0xFF27348B)),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = Color(0xFF27348B)
-                ),
-                contentPadding = PaddingValues(horizontal = 0.dp, vertical = 0.dp)
-            ) {
-                Text(
-                    text = "Registro Manual",
-                    color = Color.White,
-                    textAlign = TextAlign.Center,
-                    fontSize = 25.sp)
-            }
-
-            Spacer(modifier = Modifier.height(80.dp))
-
-            Row{
+                // Botón para activar el Modo de Registro Automático
                 Button(
-                    onClick = onDownloadClick,
+                    onClick = onScanningClick,
                     modifier = Modifier
-                        .width(143.dp)
-                        .height(35.dp)
+                        .width(300.dp)
+                        .height(39.dp)
                         .background(color = Color(0xFF27348B)),
                     colors = ButtonDefaults.buttonColors(
                         containerColor = Color(0xFF27348B)
-                    )
-                ) {
-                    Text(
-                        text="Descargar Datos",
-                        fontSize = 11.sp,
-                    )
-                }
-
-                Spacer(modifier = Modifier.width(14.dp))
-
-                Button(
-                    onClick = { showDialog = true },
-                    modifier = Modifier
-                        .width(143.dp)
-                        .height(35.dp)
-                        .background(color = Color(0xFFFF0000)),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = Color(0xFFFF0000)
                     ),
-                    contentPadding = PaddingValues(0.dp)
+                    contentPadding = PaddingValues(horizontal = 0.dp, vertical = 0.dp)
                 ) {
                     Text(
-                        text="Resetear Datos",
-                        fontSize = 11.sp,
-                        color = Color.Black,
-                        textAlign = TextAlign.Center
-                    )
+                        text = "Automático",
+                        color = Color.White,
+                        textAlign = TextAlign.Center,
+                        fontSize = 25.sp)
                 }
 
-                // Diálogo de confirmación
-                if (showDialog) {
-                    AlertDialog(
-                        onDismissRequest = { showDialog = false }, // Cierra el diálogo sin hacer nada
-                        title = { Text("Confirmar acción") },
-                        text = { Text("¿Estás seguro de que deseas resetear los datos? Esta acción no se puede deshacer.") },
-                        confirmButton = {
-                            TextButton(
-                                onClick = {
-                                    showDialog = false
-                                    onResetClick() // Llama a la acción de reseteo
+                Spacer(modifier = Modifier.height(20.dp))
+
+                // Botón para activar el Modo Registro Manual
+                Button(
+                    onClick = { showManualForm = true },
+                    modifier = Modifier
+                        .width(300.dp)
+                        .height(39.dp)
+                        .background(color = Color(0xFF27348B)),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color(0xFF27348B)
+                    ),
+                    contentPadding = PaddingValues(horizontal = 0.dp, vertical = 0.dp)
+                ) {
+                    Text(
+                        text = "Manual",
+                        color = Color.White,
+                        textAlign = TextAlign.Center,
+                        fontSize = 25.sp)
+                }
+
+                Spacer(modifier = Modifier.height(80.dp))
+
+                Row{
+                    Button(
+                        onClick = onDownloadClick,
+                        modifier = Modifier
+                            .width(143.dp)
+                            .height(35.dp)
+                            .background(color = Color(0xFF27348B)),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Color(0xFF27348B)
+                        )
+                    ) {
+                        Text(
+                            text="Descargar Datos",
+                            fontSize = 11.sp,
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.width(14.dp))
+
+                    Button(
+                        onClick = { showDialog = true },
+                        modifier = Modifier
+                            .width(143.dp)
+                            .height(35.dp)
+                            .background(color = Color(0xFFFE8200)),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Color(0xFFFE8200)
+                        ),
+                        contentPadding = PaddingValues(0.dp)
+                    ) {
+                        Text(
+                            text="Resetear Datos",
+                            fontSize = 11.sp,
+                            color = Color.Black,
+                            textAlign = TextAlign.Center
+                        )
+                    }
+
+                    // Diálogo de confirmación
+                    if (showDialog) {
+                        AlertDialog(
+                            onDismissRequest = { showDialog = false }, // Cierra el diálogo sin hacer nada
+                            title = { Text("Confirmar acción") },
+                            text = { Text("¿Estás seguro de que deseas resetear los datos? Esta acción no se puede deshacer.") },
+                            confirmButton = {
+                                TextButton(
+                                    onClick = {
+                                        showDialog = false
+                                        onResetClick() // Llama a la acción de reseteo
+                                    }
+                                ) {
+                                    Text("Sí")
                                 }
-                            ) {
-                                Text("Sí")
+                            },
+                            dismissButton = {
+                                TextButton(
+                                    onClick = { showDialog = false } // Solo cierra el diálogo
+                                ) {
+                                    Text("No")
+                                }
                             }
-                        },
-                        dismissButton = {
-                            TextButton(
-                                onClick = { showDialog = false } // Solo cierra el diálogo
-                            ) {
-                                Text("No")
-                            }
+                        )
+                    }
+                }
+
+            }else {
+
+                Spacer(modifier = Modifier.height(40.dp))
+                // Título
+                Text(
+                    text = "Registre sus Datos",
+                    color = Color(0xFF27348B),
+                    fontSize = 30.sp,
+                    fontWeight = FontWeight.Bold,
+                    fontStyle = FontStyle.Italic,
+                    textAlign = TextAlign.Center,
+                    lineHeight = 60.sp,
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                Spacer(modifier = Modifier.height(10.dp))
+
+                // Formulario de Registro Manual
+                TextField(
+                    value = cedula,
+                    onValueChange = { cedula = it },
+                    label = { Text("Cédula") },
+                    modifier = Modifier.fillMaxWidth().padding(16.dp)
+                )
+                TextField(
+                    value = nombreCompleto,
+                    onValueChange = { nombreCompleto = it },
+                    label = { Text("Nombre Completo") },
+                    modifier = Modifier.fillMaxWidth().padding(16.dp)
+                )
+                TextField(
+                    value = correo,
+                    onValueChange = { correo = it },
+                    label = { Text("Correo Electrónico") },
+                    modifier = Modifier.fillMaxWidth().padding(16.dp)
+                )
+                DropdownRole(selectedRol = rol, onRolSelected = { rol = it }, roles = roles)
+                Row(
+                    horizontalArrangement = Arrangement.SpaceEvenly,
+                    modifier = Modifier.fillMaxWidth().padding(16.dp)
+                ) {
+                    Button(onClick = {
+                        if (cedula.isNotEmpty() && nombreCompleto.isNotEmpty() && correo.isNotEmpty() && rol.isNotEmpty()) {
+                            val currentDateTime = LocalDateTime.now()
+                            val formattedDateTime = currentDateTime.format(
+                                DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")
+                            )
+                            saveToCSV(
+                                "MANUAL",
+                                correo,
+                                formattedDateTime,
+                                cedula,
+                                nombreCompleto,
+                                rol
+                            )
+                            showManualForm = false
+                            // Limpiar campos
+                            cedula = ""
+                            nombreCompleto = ""
+                            correo = ""
+                            rol = ""
+                        } else {
+                            // Manejo de error
+                            Toast.makeText(
+                                this@MainActivity,
+                                "Por favor, llene todos los campos",
+                                Toast.LENGTH_SHORT
+                            ).show()
                         }
-                    )
+                    }) {
+                        Text("Guardar")
+                    }
+                    Button(onClick = {
+                        showManualForm = false
+                        // Limpiar campos
+                        cedula = ""
+                        nombreCompleto = ""
+                        correo = ""
+                        rol = ""
+                    }) {
+                        Text("Cancelar")
+                    }
                 }
             }
-
             Spacer(modifier = Modifier.weight(1f))
 
             // Línea divisora
@@ -287,6 +388,46 @@ class MainActivity : ComponentActivity() {
                 textAlign = TextAlign.Center,
                 modifier = Modifier.fillMaxWidth()
             )
+        }
+    }
+
+
+    @Composable
+    fun DropdownRole(
+        selectedRol: String,
+        onRolSelected: (String) -> Unit,
+        roles: List<String>
+    ) {
+        var expanded by remember { mutableStateOf(false) }
+
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .wrapContentSize(Alignment.TopStart)
+        ) {
+            OutlinedButton(
+                onClick = { expanded = true },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(
+                    text = if (selectedRol.isNotEmpty()) selectedRol else "Seleccionar Rol"
+                )
+            }
+            DropdownMenu(
+                expanded = expanded,
+                onDismissRequest = { expanded = false },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                roles.forEach { role ->
+                    DropdownMenuItem(
+                        text = { Text(text = role) },
+                        onClick = {
+                            onRolSelected(role)
+                            expanded = false
+                        }
+                    )
+                }
+            }
         }
     }
 
