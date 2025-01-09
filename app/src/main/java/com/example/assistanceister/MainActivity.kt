@@ -88,7 +88,7 @@ class MainActivity : ComponentActivity() {
 
 
     private fun resetFile() {
-        val file = File(getExternalFilesDir(null), "qr_data.csv")
+        val file = File(getExternalFilesDir(null), "assistance_data.csv")
         if (file.exists()) {
             if (file.delete()) {
                 Toast.makeText(this, "Archivo reseteado correctamente", Toast.LENGTH_SHORT).show()
@@ -214,7 +214,7 @@ class MainActivity : ComponentActivity() {
                 ) {
                     Text(
                         text="Descargar Datos",
-                        fontSize = 12.sp,
+                        fontSize = 11.sp,
                     )
                 }
 
