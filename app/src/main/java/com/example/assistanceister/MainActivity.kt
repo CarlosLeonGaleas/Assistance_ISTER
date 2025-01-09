@@ -149,88 +149,121 @@ class MainActivity : ComponentActivity() {
             Text(
                 text = "Registro de Asistencia",
                 color = Color(0xFF27348B),
-                fontSize = 50.sp,
+                fontSize = 60.sp,
                 fontWeight = FontWeight.Bold,
                 fontStyle = FontStyle.Italic,
                 textAlign = TextAlign.Center,
-                lineHeight = 50.sp,
+                lineHeight = 60.sp,
                 modifier = Modifier.fillMaxWidth()
             )
 
             Spacer(modifier = Modifier.height(80.dp))
 
-            // Botón para activar el Modo Escaneo
-
+            // Botón para activar el Modo de Registro Automático
             Button(
                 onClick = onScanningClick,
                 modifier = Modifier
                     .width(300.dp)
-                    .height(49.dp)
+                    .height(39.dp)
                     .background(color = Color(0xFF27348B)),
                 colors = ButtonDefaults.buttonColors(
                     containerColor = Color(0xFF27348B)
-                )
+                ),
+                contentPadding = PaddingValues(horizontal = 0.dp, vertical = 0.dp)
             ) {
                 Text(
-                    text = "Empezar Registro",
+                    text = "Registro Automático",
                     color = Color.White,
-                    textAlign = TextAlign.Center)
+                    textAlign = TextAlign.Center,
+                    fontSize = 25.sp)
             }
 
             Spacer(modifier = Modifier.height(20.dp))
 
+            // Botón para activar el Modo Registro Manual
             Button(
-                onClick = onDownloadClick,
+                onClick = onScanningClick,
                 modifier = Modifier
-                    .width(150.dp)
-                    .height(35.dp)
+                    .width(300.dp)
+                    .height(39.dp)
                     .background(color = Color(0xFF27348B)),
                 colors = ButtonDefaults.buttonColors(
                     containerColor = Color(0xFF27348B)
-                )
+                ),
+                contentPadding = PaddingValues(horizontal = 0.dp, vertical = 0.dp)
             ) {
-                Text("Descargar Datos")
+                Text(
+                    text = "Registro Manual",
+                    color = Color.White,
+                    textAlign = TextAlign.Center,
+                    fontSize = 25.sp)
             }
 
-            Spacer(modifier = Modifier.height(20.dp))
+            Spacer(modifier = Modifier.height(80.dp))
 
-            Button(
-                onClick = { showDialog = true },
-                modifier = Modifier
-                    .width(150.dp)
-                    .height(35.dp)
-                    .background(color = Color(0xFFFF0000)),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = Color(0xFFFF0000)
-                )
-            ) {
-                Text("Resetear Datos")
-            }
+            Row{
+                Button(
+                    onClick = onDownloadClick,
+                    modifier = Modifier
+                        .width(143.dp)
+                        .height(35.dp)
+                        .background(color = Color(0xFF27348B)),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color(0xFF27348B)
+                    )
+                ) {
+                    Text(
+                        text="Descargar Datos",
+                        fontSize = 12.sp,
+                    )
+                }
 
-            // Diálogo de confirmación
-            if (showDialog) {
-                AlertDialog(
-                    onDismissRequest = { showDialog = false }, // Cierra el diálogo sin hacer nada
-                    title = { Text("Confirmar acción") },
-                    text = { Text("¿Estás seguro de que deseas resetear los datos? Esta acción no se puede deshacer.") },
-                    confirmButton = {
-                        TextButton(
-                            onClick = {
-                                showDialog = false
-                                onResetClick() // Llama a la acción de reseteo
+                Spacer(modifier = Modifier.width(14.dp))
+
+                Button(
+                    onClick = { showDialog = true },
+                    modifier = Modifier
+                        .width(143.dp)
+                        .height(35.dp)
+                        .background(color = Color(0xFFFF0000)),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color(0xFFFF0000)
+                    ),
+                    contentPadding = PaddingValues(0.dp)
+                ) {
+                    Text(
+                        text="Resetear Datos",
+                        fontSize = 11.sp,
+                        color = Color.Black,
+                        textAlign = TextAlign.Center
+                    )
+                }
+
+                // Diálogo de confirmación
+                if (showDialog) {
+                    AlertDialog(
+                        onDismissRequest = { showDialog = false }, // Cierra el diálogo sin hacer nada
+                        title = { Text("Confirmar acción") },
+                        text = { Text("¿Estás seguro de que deseas resetear los datos? Esta acción no se puede deshacer.") },
+                        confirmButton = {
+                            TextButton(
+                                onClick = {
+                                    showDialog = false
+                                    onResetClick() // Llama a la acción de reseteo
+                                }
+                            ) {
+                                Text("Sí")
                             }
-                        ) {
-                            Text("Sí")
+                        },
+                        dismissButton = {
+                            TextButton(
+                                onClick = { showDialog = false } // Solo cierra el diálogo
+                            ) {
+                                Text("No")
+                            }
                         }
-                    },
-                    dismissButton = {
-                        TextButton(
-                            onClick = { showDialog = false } // Solo cierra el diálogo
-                        ) {
-                            Text("No")
-                        }
-                    }
-                )
+                    )
+                }
             }
 
             Spacer(modifier = Modifier.weight(1f))
