@@ -109,7 +109,7 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun downloadFile() {
-        val sourceFile = File(getExternalFilesDir(null), "qr_data.csv")
+        val sourceFile = File(getExternalFilesDir(null), "assistance_data.csv")
         if (sourceFile.exists()) {
             val downloadsDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
             if (!downloadsDir.exists()) {
@@ -339,6 +339,11 @@ class MainActivity : ComponentActivity() {
                                 rol
                             )
                             showManualForm = false
+                            Toast.makeText(
+                                this@MainActivity,
+                                "El registro se completó correctamente " + nombreCompleto,
+                                Toast.LENGTH_SHORT
+                            ).show()
                             // Limpiar campos
                             cedula = ""
                             nombreCompleto = ""
@@ -562,7 +567,7 @@ class MainActivity : ComponentActivity() {
         rol: String
     ) {
         try {
-            val file = File(getExternalFilesDir(null), "qr_data.csv")
+            val file = File(getExternalFilesDir(null), "assistance_data.csv")
             val fileExists = file.exists()
 
             FileWriter(file, true).use { writer ->
