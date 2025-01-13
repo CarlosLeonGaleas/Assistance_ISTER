@@ -12,16 +12,19 @@ import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.annotation.RequiresApi
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -140,7 +143,7 @@ class MainActivity : ComponentActivity() {
         var nombreCompleto by remember { mutableStateOf("") }
         var correo by remember { mutableStateOf("") }
         var rol by remember { mutableStateOf("") }
-        val roles = listOf("Público Externo", "Estudiante", "Docente", "Administrativo")
+        val roles = listOf("Público Externo", "Estudiante ISTER", "Docente ISTER", "Administrativo ISTER")
 
         Column(
             modifier = Modifier
@@ -304,27 +307,56 @@ class MainActivity : ComponentActivity() {
                 TextField(
                     value = cedula,
                     onValueChange = { cedula = it },
-                    label = { Text("Cédula") },
-                    modifier = Modifier.fillMaxWidth().padding(16.dp)
+                    label = { Text("Cédula", style = TextStyle(fontWeight = FontWeight.Bold)) },
+                    modifier = Modifier.fillMaxWidth().padding(16.dp),
+                    colors = TextFieldDefaults.colors(
+                        focusedContainerColor= Color(0x4027348B),
+                        unfocusedContainerColor = Color(0x3327348B),
+                        focusedLabelColor  = Color.Black,
+                        unfocusedLabelColor  = Color.Black,
+                        focusedIndicatorColor  = Color(0xFF27348B)
+                    )
                 )
                 TextField(
                     value = nombreCompleto,
                     onValueChange = { nombreCompleto = it },
-                    label = { Text("Nombre Completo") },
-                    modifier = Modifier.fillMaxWidth().padding(16.dp)
+                    label = { Text("Nombre Completo", style = TextStyle(fontWeight = FontWeight.Bold)) },
+                    modifier = Modifier.fillMaxWidth().padding(16.dp),
+                    colors = TextFieldDefaults.colors(
+                        focusedContainerColor= Color(0x4027348B),
+                        unfocusedContainerColor = Color(0x3327348B),
+                        focusedLabelColor  = Color.Black,
+                        unfocusedLabelColor  = Color.Black,
+                        focusedIndicatorColor  = Color(0xFF27348B)
+                    )
                 )
                 TextField(
                     value = correo,
                     onValueChange = { correo = it },
-                    label = { Text("Correo Electrónico") },
-                    modifier = Modifier.fillMaxWidth().padding(16.dp)
+                    label = { Text("Correo Electrónico", style = TextStyle(fontWeight = FontWeight.Bold)) },
+                    modifier = Modifier.fillMaxWidth().padding(16.dp),
+                    colors = TextFieldDefaults.colors(
+                        focusedContainerColor= Color(0x4027348B),
+                        unfocusedContainerColor = Color(0x3327348B),
+                        focusedLabelColor  = Color.Black,
+                        unfocusedLabelColor  = Color.Black,
+                        focusedIndicatorColor  = Color(0xFF27348B)
+                    )
                 )
                 DropdownRole(selectedRol = rol, onRolSelected = { rol = it }, roles = roles)
                 Row(
                     horizontalArrangement = Arrangement.SpaceEvenly,
                     modifier = Modifier.fillMaxWidth().padding(16.dp)
                 ) {
-                    Button(onClick = {
+                    Button(
+                        modifier = Modifier
+                            .width(110.dp)
+                            .height(35.dp)
+                            .background(color = Color(0xFF27348B)),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Color(0xFF27348B)
+                        ),
+                        onClick = {
                         if (cedula.isNotEmpty() && nombreCompleto.isNotEmpty() && correo.isNotEmpty() && rol.isNotEmpty()) {
                             val currentDateTime = LocalDateTime.now()
                             val formattedDateTime = currentDateTime.format(
@@ -341,7 +373,7 @@ class MainActivity : ComponentActivity() {
                             showManualForm = false
                             Toast.makeText(
                                 this@MainActivity,
-                                "El registro se completó correctamente " + nombreCompleto,
+                                "El registro se GUARDÓ correctamente " + nombreCompleto,
                                 Toast.LENGTH_SHORT
                             ).show()
                             // Limpiar campos
@@ -349,6 +381,7 @@ class MainActivity : ComponentActivity() {
                             nombreCompleto = ""
                             correo = ""
                             rol = ""
+
                         } else {
                             // Manejo de error
                             Toast.makeText(
@@ -360,13 +393,26 @@ class MainActivity : ComponentActivity() {
                     }) {
                         Text("Guardar")
                     }
-                    Button(onClick = {
-                        showManualForm = false
-                        // Limpiar campos
-                        cedula = ""
-                        nombreCompleto = ""
-                        correo = ""
-                        rol = ""
+                    Button(
+                        modifier = Modifier
+                            .width(110.dp)
+                            .height(35.dp)
+                            .background(color = Color(0xFF27348B)),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Color(0xFF27348B)
+                        ),
+                        onClick = {
+                            showManualForm = false
+                            Toast.makeText(
+                                this@MainActivity,
+                                "El registro se CANCELÓ correctamente. ",
+                                Toast.LENGTH_SHORT
+                            ).show()
+                            // Limpiar campos
+                            cedula = ""
+                            nombreCompleto = ""
+                            correo = ""
+                            rol = ""
                     }) {
                         Text("Cancelar")
                     }
@@ -384,7 +430,7 @@ class MainActivity : ComponentActivity() {
             Spacer(modifier = Modifier.height(8.dp))
 
             // Pie de página
-            Text(
+            /*Text(
                 text = "Desarrollado por: Ing. Carlos León Galeas",
                 color = Color(0xFF27348B),
                 fontSize = 10.sp,
@@ -392,7 +438,9 @@ class MainActivity : ComponentActivity() {
                 fontStyle = FontStyle.Italic,
                 textAlign = TextAlign.Center,
                 modifier = Modifier.fillMaxWidth()
-            )
+            )*/
+            CopyrightFooter()
+
         }
     }
 
@@ -407,21 +455,29 @@ class MainActivity : ComponentActivity() {
 
         Box(
             modifier = Modifier
-                .fillMaxWidth()
+                .fillMaxWidth().padding(16.dp)
                 .wrapContentSize(Alignment.TopStart)
         ) {
             OutlinedButton(
                 onClick = { expanded = true },
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth(),
+                colors = ButtonDefaults.outlinedButtonColors(
+                    containerColor = Color(0x3327348B), // Fondo del botón
+                    contentColor = Color.Black // Color del texto
+                ),
+                border = BorderStroke(0.5.dp, Color(0xFF27348B)),
+                shape = RoundedCornerShape(6.dp)
             ) {
                 Text(
-                    text = if (selectedRol.isNotEmpty()) selectedRol else "Seleccionar Rol"
+                    text = if (selectedRol.isNotEmpty()) selectedRol else "Seleccionar Rol",
+                    fontWeight = if (selectedRol.isNotEmpty()) FontWeight.Normal else FontWeight.Bold,
+                    textAlign = TextAlign.Left
                 )
             }
             DropdownMenu(
                 expanded = expanded,
                 onDismissRequest = { expanded = false },
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth().padding(16.dp)
             ) {
                 roles.forEach { role ->
                     DropdownMenuItem(
@@ -436,10 +492,23 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    @Composable
+    fun CopyrightFooter() {
+        Text(
+            text = "© 2025 Carlos León Galeas. Todos los derechos reservados.",
+            color = Color(0xFF27348B),
+            fontSize = 10.sp,
+            fontWeight = FontWeight.Bold,
+            fontStyle = FontStyle.Italic,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.fillMaxWidth()
+        )
+    }
+
 
     private fun setupRetrofit() {
         val retrofit = Retrofit.Builder()
-            .baseUrl("http://18.189.145.51/") // Cambia esto por la URL de tu backend
+            .baseUrl("http://3.15.11.34/") // Cambia esto por la URL de tu backend
             .addConverterFactory(GsonConverterFactory.create())
             .build()
 
