@@ -1,11 +1,14 @@
 package com.example.assistanceister
 
 import android.Manifest
+import android.content.ContentValues
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.media.MediaScannerConnection
 import android.os.Build
 import android.os.Bundle
 import android.os.Environment
+import android.provider.MediaStore
 import android.speech.tts.TextToSpeech
 import android.util.Log
 import android.widget.Toast
@@ -52,7 +55,7 @@ class MainActivity : ComponentActivity() {
     private lateinit var apiService: ApiService
     private var isScanning = false
     private lateinit var textToSpeech: TextToSpeech
-
+    private var isProcessing = false // Variable para evitar procesamiento múltiple
 
     @RequiresApi(Build.VERSION_CODES.O)
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -77,17 +80,12 @@ class MainActivity : ComponentActivity() {
         textToSpeech = TextToSpeech(this) { status ->
             if (status == TextToSpeech.SUCCESS) {
                 textToSpeech.language = Locale.getDefault()
-
-                // Ajustar velocidad de lectura (1.0 es normal, 0.5 es más lento, 2.0 es más rápido)
                 textToSpeech.setSpeechRate(1.3f)
-
-                // Ajustar tono de voz (1.0 es normal, 0.5 es más grave, 2.0 es más agudo)
                 textToSpeech.setPitch(0.8f)
-            }else {
+            } else {
                 Log.e("TTS", "Inicialización fallida")
             }
         }
-
     }
 
     override fun onDestroy() {
@@ -96,7 +94,6 @@ class MainActivity : ComponentActivity() {
             textToSpeech.shutdown()
         }
     }
-
 
     private fun resetFile() {
         val file = File(getExternalFilesDir(null), "assistance_data.csv")
@@ -113,31 +110,75 @@ class MainActivity : ComponentActivity() {
 
     private fun downloadFile() {
         val sourceFile = File(getExternalFilesDir(null), "assistance_data.csv")
-        if (sourceFile.exists()) {
-            val downloadsDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
-            if (!downloadsDir.exists()) {
-                downloadsDir.mkdirs() // Crea la carpeta Descargas si no existe
-            }
-
-            val targetFile = File(downloadsDir, sourceFile.name)
-            try {
-                sourceFile.copyTo(targetFile, overwrite = true)
-                Toast.makeText(this, "Archivo guardado en Descargas", Toast.LENGTH_SHORT).show()
-            } catch (e: Exception) {
-                Toast.makeText(this, "Error al guardar archivo: ${e.message}", Toast.LENGTH_SHORT).show()
-            }
-        } else {
+        if (!sourceFile.exists()) {
             Toast.makeText(this, "No hay archivo para descargar", Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                // Para Android 10+ usar MediaStore para acceso a carpetas públicas
+                saveFileUsingMediaStore(sourceFile)
+            } else {
+                // Para versiones anteriores, acceso directo a carpetas públicas
+                saveFileToPublicDirectory(sourceFile)
+            }
+        } catch (e: Exception) {
+            Log.e("Download", "Error al guardar archivo", e)
+            Toast.makeText(this, "Error al guardar archivo: ${e.message}", Toast.LENGTH_SHORT).show()
         }
     }
 
+    @RequiresApi(Build.VERSION_CODES.Q)
+    private fun saveFileUsingMediaStore(sourceFile: File) {
+        val resolver = contentResolver
+        val contentValues = ContentValues().apply {
+            put(MediaStore.MediaColumns.DISPLAY_NAME, "assistance_data_${System.currentTimeMillis()}.csv")
+            put(MediaStore.MediaColumns.MIME_TYPE, "text/csv")
+            put(MediaStore.MediaColumns.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS)
+        }
+
+        val uri = resolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, contentValues)
+
+        uri?.let { targetUri ->
+            resolver.openOutputStream(targetUri)?.use { outputStream ->
+                sourceFile.inputStream().use { inputStream ->
+                    inputStream.copyTo(outputStream)
+                }
+            }
+            Toast.makeText(this, "Archivo guardado en Descargas", Toast.LENGTH_LONG).show()
+        } ?: run {
+            throw Exception("No se pudo crear el archivo en Descargas")
+        }
+    }
+
+    private fun saveFileToPublicDirectory(sourceFile: File) {
+        val downloadsDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
+        if (!downloadsDir.exists()) {
+            downloadsDir.mkdirs()
+        }
+
+        val targetFile = File(downloadsDir, "assistance_data_${System.currentTimeMillis()}.csv")
+        sourceFile.copyTo(targetFile, overwrite = true)
+
+        // Notificar al MediaScanner para que el archivo aparezca inmediatamente
+        MediaScannerConnection.scanFile(
+            this,
+            arrayOf(targetFile.absolutePath),
+            arrayOf("text/csv")
+        ) { path, uri ->
+            Log.d("MediaScanner", "Archivo escaneado: $path")
+        }
+
+        Toast.makeText(this, "Archivo guardado en Descargas: ${targetFile.name}", Toast.LENGTH_LONG).show()
+    }
 
     @RequiresApi(Build.VERSION_CODES.O)
     @Composable
     fun MainScreen(onScanningClick: () -> Unit,
-                        onResetClick: () -> Unit,
-                        onDownloadClick: () -> Unit) {
-        var showDialog by remember { mutableStateOf(false) } // Controla si se muestra el diálogo
+                   onResetClick: () -> Unit,
+                   onDownloadClick: () -> Unit) {
+        var showDialog by remember { mutableStateOf(false) }
         var showManualForm by remember { mutableStateOf(false) }
         var cedula by remember { mutableStateOf("") }
         var nombreCompleto by remember { mutableStateOf("") }
@@ -153,7 +194,6 @@ class MainActivity : ComponentActivity() {
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Spacer(modifier = Modifier.height(25.dp))
-            // Imagen (Logo del Departamento)
             Image(
                 painter = painterResource(id = R.drawable.logo_departamento),
                 contentDescription = "Logo del Departamento",
@@ -165,7 +205,6 @@ class MainActivity : ComponentActivity() {
             if (!showManualForm) {
                 Spacer(modifier = Modifier.height(80.dp))
 
-                // Título
                 Text(
                     text = "Registro de Asistencia",
                     color = Color(0xFF27348B),
@@ -179,7 +218,6 @@ class MainActivity : ComponentActivity() {
 
                 Spacer(modifier = Modifier.height(80.dp))
 
-                // Botón para activar el Modo de Registro Automático
                 Button(
                     onClick = onScanningClick,
                     modifier = Modifier
@@ -200,7 +238,6 @@ class MainActivity : ComponentActivity() {
 
                 Spacer(modifier = Modifier.height(20.dp))
 
-                // Botón para activar el Modo Registro Manual
                 Button(
                     onClick = { showManualForm = true },
                     modifier = Modifier
@@ -259,17 +296,16 @@ class MainActivity : ComponentActivity() {
                         )
                     }
 
-                    // Diálogo de confirmación
                     if (showDialog) {
                         AlertDialog(
-                            onDismissRequest = { showDialog = false }, // Cierra el diálogo sin hacer nada
+                            onDismissRequest = { showDialog = false },
                             title = { Text("Confirmar acción") },
                             text = { Text("¿Estás seguro de que deseas resetear los datos? Esta acción no se puede deshacer.") },
                             confirmButton = {
                                 TextButton(
                                     onClick = {
                                         showDialog = false
-                                        onResetClick() // Llama a la acción de reseteo
+                                        onResetClick()
                                     }
                                 ) {
                                     Text("Sí")
@@ -277,7 +313,7 @@ class MainActivity : ComponentActivity() {
                             },
                             dismissButton = {
                                 TextButton(
-                                    onClick = { showDialog = false } // Solo cierra el diálogo
+                                    onClick = { showDialog = false }
                                 ) {
                                     Text("No")
                                 }
@@ -286,10 +322,8 @@ class MainActivity : ComponentActivity() {
                     }
                 }
 
-            }else {
-
+            } else {
                 Spacer(modifier = Modifier.height(40.dp))
-                // Título
                 Text(
                     text = "Registre sus Datos",
                     color = Color(0xFF27348B),
@@ -303,7 +337,6 @@ class MainActivity : ComponentActivity() {
 
                 Spacer(modifier = Modifier.height(10.dp))
 
-                // Formulario de Registro Manual
                 TextField(
                     value = cedula,
                     onValueChange = { cedula = it },
@@ -357,40 +390,37 @@ class MainActivity : ComponentActivity() {
                             containerColor = Color(0xFF27348B)
                         ),
                         onClick = {
-                        if (cedula.isNotEmpty() && nombreCompleto.isNotEmpty() && correo.isNotEmpty() && rol.isNotEmpty()) {
-                            val currentDateTime = LocalDateTime.now()
-                            val formattedDateTime = currentDateTime.format(
-                                DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")
-                            )
-                            saveToCSV(
-                                "MANUAL",
-                                correo,
-                                formattedDateTime,
-                                cedula,
-                                nombreCompleto,
-                                rol
-                            )
-                            showManualForm = false
-                            Toast.makeText(
-                                this@MainActivity,
-                                "El registro se GUARDÓ correctamente " + nombreCompleto,
-                                Toast.LENGTH_SHORT
-                            ).show()
-                            // Limpiar campos
-                            cedula = ""
-                            nombreCompleto = ""
-                            correo = ""
-                            rol = ""
-
-                        } else {
-                            // Manejo de error
-                            Toast.makeText(
-                                this@MainActivity,
-                                "Por favor, llene todos los campos",
-                                Toast.LENGTH_SHORT
-                            ).show()
-                        }
-                    }) {
+                            if (cedula.isNotEmpty() && nombreCompleto.isNotEmpty() && correo.isNotEmpty() && rol.isNotEmpty()) {
+                                val currentDateTime = LocalDateTime.now()
+                                val formattedDateTime = currentDateTime.format(
+                                    DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")
+                                )
+                                saveToCSV(
+                                    "MANUAL",
+                                    correo,
+                                    formattedDateTime,
+                                    cedula,
+                                    nombreCompleto,
+                                    rol
+                                )
+                                showManualForm = false
+                                Toast.makeText(
+                                    this@MainActivity,
+                                    "El registro se GUARDÓ correctamente " + nombreCompleto,
+                                    Toast.LENGTH_SHORT
+                                ).show()
+                                cedula = ""
+                                nombreCompleto = ""
+                                correo = ""
+                                rol = ""
+                            } else {
+                                Toast.makeText(
+                                    this@MainActivity,
+                                    "Por favor, llene todos los campos",
+                                    Toast.LENGTH_SHORT
+                                ).show()
+                            }
+                        }) {
                         Text("Guardar")
                     }
                     Button(
@@ -408,19 +438,17 @@ class MainActivity : ComponentActivity() {
                                 "El registro se CANCELÓ correctamente. ",
                                 Toast.LENGTH_SHORT
                             ).show()
-                            // Limpiar campos
                             cedula = ""
                             nombreCompleto = ""
                             correo = ""
                             rol = ""
-                    }) {
+                        }) {
                         Text("Cancelar")
                     }
                 }
             }
             Spacer(modifier = Modifier.weight(1f))
 
-            // Línea divisora
             Divider(
                 color = Color(0xFFFF8000),
                 thickness = 3.dp,
@@ -429,21 +457,9 @@ class MainActivity : ComponentActivity() {
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            // Pie de página
-            /*Text(
-                text = "Desarrollado por: Ing. Carlos León Galeas",
-                color = Color(0xFF27348B),
-                fontSize = 10.sp,
-                fontWeight = FontWeight.Bold,
-                fontStyle = FontStyle.Italic,
-                textAlign = TextAlign.Center,
-                modifier = Modifier.fillMaxWidth()
-            )*/
             CopyrightFooter()
-
         }
     }
-
 
     @Composable
     fun DropdownRole(
@@ -462,8 +478,8 @@ class MainActivity : ComponentActivity() {
                 onClick = { expanded = true },
                 modifier = Modifier.fillMaxWidth(),
                 colors = ButtonDefaults.outlinedButtonColors(
-                    containerColor = Color(0x3327348B), // Fondo del botón
-                    contentColor = Color.Black // Color del texto
+                    containerColor = Color(0x3327348B),
+                    contentColor = Color.Black
                 ),
                 border = BorderStroke(0.5.dp, Color(0xFF27348B)),
                 shape = RoundedCornerShape(6.dp)
@@ -505,10 +521,9 @@ class MainActivity : ComponentActivity() {
         )
     }
 
-
     private fun setupRetrofit() {
         val retrofit = Retrofit.Builder()
-            .baseUrl("http://3.15.11.34/") // Cambia esto por la URL de tu backend
+            .baseUrl("http://3.148.205.45/")
             .addConverterFactory(GsonConverterFactory.create())
             .build()
 
@@ -516,41 +531,51 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun checkPermissions() {
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA)
-            != PackageManager.PERMISSION_GRANTED) {
-            ActivityCompat.requestPermissions(
-                this,
-                arrayOf(Manifest.permission.CAMERA, Manifest.permission.WRITE_EXTERNAL_STORAGE),
-                CAMERA_PERMISSION_REQUEST
-            )
+        val permissions = mutableListOf<String>()
+
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
+            permissions.add(Manifest.permission.CAMERA)
+        }
+
+        // Permisos de almacenamiento según la versión de Android
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            // Android 13+
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_MEDIA_IMAGES) != PackageManager.PERMISSION_GRANTED) {
+                permissions.add(Manifest.permission.READ_MEDIA_IMAGES)
+            }
+        } else {
+            // Android 12 y anteriores
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
+                permissions.add(Manifest.permission.WRITE_EXTERNAL_STORAGE)
+            }
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
+                permissions.add(Manifest.permission.READ_EXTERNAL_STORAGE)
+            }
+        }
+
+        if (permissions.isNotEmpty()) {
+            ActivityCompat.requestPermissions(this, permissions.toTypedArray(), CAMERA_PERMISSION_REQUEST)
         }
     }
 
     private fun startQRScanner() {
+        if (isProcessing) return // Evitar múltiples escaneos simultáneos
+
         val integrator = IntentIntegrator(this)
         integrator.setDesiredBarcodeFormats(IntentIntegrator.QR_CODE)
         integrator.setPrompt("Escanea un código QR")
         integrator.setCameraId(0)
         integrator.setBeepEnabled(false)
+        // Configuraciones para mejorar rendimiento
+        integrator.setTorchEnabled(false)
+        integrator.setBarcodeImageEnabled(false)
         integrator.initiateScan()
     }
 
     private fun startContinuousScan() {
         isScanning = true
-        lifecycleScope.launch {
-            while (isScanning) {
-                try {
-                    startQRScanner()
-                } catch (e: Exception) {
-                    Toast.makeText(this@MainActivity, "Error: ${e.message}", Toast.LENGTH_SHORT).show()
-                }
-
-                // Esperar 2 segundos antes de volver a escanear
-                delay(2000)
-            }
-        }
+        startQRScanner() // Iniciar el primer escaneo inmediatamente
     }
-
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         val result = IntentIntegrator.parseActivityResult(requestCode, resultCode, data)
@@ -569,6 +594,9 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun processQRUrl(url: String) {
+        if (isProcessing) return // Evitar procesamiento múltiple
+        isProcessing = true
+
         lifecycleScope.launch {
             try {
                 val response = withContext(Dispatchers.IO) {
@@ -587,7 +615,6 @@ class MainActivity : ComponentActivity() {
                             webData.rol ?: "null"
                         )
 
-                        // Modificado aquí para mostrar el mensaje correspondiente
                         val toastMessage = if (webData.nombre != null) {
                             "Gracias por Asistir ${webData.nombre}"
                         } else {
@@ -622,10 +649,17 @@ class MainActivity : ComponentActivity() {
                     "Error: ${e.message}",
                     Toast.LENGTH_SHORT
                 ).show()
+            } finally {
+                isProcessing = false
+                // Continuar escaneando si está en modo continuo
+                if (isScanning) {
+                    // Pequeño delay antes del siguiente escaneo
+                    delay(500)
+                    startQRScanner()
+                }
             }
         }
     }
-
 
     private fun saveToCSV(
         url: String,
@@ -646,10 +680,9 @@ class MainActivity : ComponentActivity() {
                 writer.append("$url,$correo,$fechaRegistro,$identificacion,$nombre,$rol\n")
             }
         } catch (e: Exception) {
-            e.printStackTrace()
+            Log.e("CSV", "Error guardando CSV", e)
         }
     }
-
 
     companion object {
         private const val CAMERA_PERMISSION_REQUEST = 100
